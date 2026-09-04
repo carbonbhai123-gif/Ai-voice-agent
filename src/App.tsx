@@ -46,6 +46,7 @@ export default function App() {
     micLevel,
     aiLevel,
     errorMessage,
+    isServerless,
     startCall,
     endCall,
     toggleMute,
@@ -83,7 +84,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono uppercase tracking-wider">
             <span className="w-2 h-2 rounded-none bg-emerald-400"></span>
-            GEMINI LIVE AUDIO API ACTIVE
+            {isServerless ? 'GEMINI SERVERLESS VOICE GATEWAY' : 'GEMINI LIVE AUDIO API ACTIVE'}
           </div>
         </div>
 
@@ -99,6 +100,7 @@ export default function App() {
                 micLevel={micLevel}
                 aiLevel={aiLevel}
                 errorMessage={errorMessage}
+                isServerless={isServerless}
                 onStartCall={startCall}
                 onEndCall={endCall}
                 onToggleMute={toggleMute}

@@ -28,6 +28,7 @@ interface CallConsoleProps {
   micLevel: number;
   aiLevel: number;
   errorMessage: string | null;
+  isServerless?: boolean;
   onStartCall: (prompt?: string) => void;
   onEndCall: () => void;
   onToggleMute: () => void;
@@ -42,6 +43,7 @@ export function CallConsole({
   micLevel,
   aiLevel,
   errorMessage,
+  isServerless,
   onStartCall,
   onEndCall,
   onToggleMute,
@@ -109,9 +111,9 @@ export function CallConsole({
           <div>
             <div className="text-xs font-mono font-bold tracking-widest text-zinc-400 uppercase">
               {callState === 'idle' && 'VOICE TRUNK: STANDBY • READY TO GREET'}
-              {callState === 'connecting' && 'CONNECTING TO ADESH (GEMINI LIVE)...'}
-              {callState === 'speaking' && 'ADESH TRANSMITTING (AUDIO OUT)'}
-              {callState === 'listening' && (isMuted ? 'MIC MUTED' : 'LISTENING (HINDI / ENGLISH / HINGLISH)')}
+              {callState === 'connecting' && 'CONNECTING TO ADESH (AI REP)...'}
+              {callState === 'speaking' && (isServerless ? 'ADESH TRANSMITTING (VOICE SYNTHESIS)' : 'ADESH TRANSMITTING (AUDIO OUT)')}
+              {callState === 'listening' && (isServerless ? 'READY • SPEAK OR CLICK PROMPT' : (isMuted ? 'MIC MUTED' : 'LISTENING (HINDI / ENGLISH / HINGLISH)'))}
               {callState === 'interrupted' && 'BARGE-IN / CALLER INTERRUPT'}
               {callState === 'ended' && 'LINE RELEASED / CALL ENDED'}
               {callState === 'error' && 'CONNECTION NOTICE'}
@@ -122,6 +124,11 @@ export function CallConsole({
                 <Globe className="w-3 h-3 text-orange-500" />
                 English • हिंदी • Hinglish
               </span>
+              {isServerless && isCallActive && (
+                <span className="text-[10px] font-mono not-italic px-2 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  Serverless Voice
+                </span>
+              )}
             </div>
           </div>
         </div>

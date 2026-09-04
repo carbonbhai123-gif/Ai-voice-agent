@@ -25,6 +25,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
+  const [isServerless, setIsServerless] = useState<boolean>(false);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [micLevel, setMicLevel] = useState<number>(0);
   const [aiLevel, setAiLevel] = useState<number>(0);
@@ -41,6 +42,37 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
   const isConnectedRef = useRef<boolean>(false);
 
   isMutedRef.current = isMuted;
+
+  // Speak Adesh's response aloud via Web Speech API
+  const speakAdeshResponse = useCallback((text: string, onDone?: () => void) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const hasHindi = /[\u0900-\u097F]/.test(text);
+      utterance.lang = hasHindi ? 'hi-IN' : 'en-IN';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => {
+        setCallState('speaking');
+        setAiLevel(0.85);
+      };
+      utterance.onend = () => {
+        setCallState('listening');
+        setAiLevel(0);
+        onDone?.();
+      };
+      utterance.onerror = () => {
+        setCallState('listening');
+        setAiLevel(0);
+        onDone?.();
+      };
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setCallState('listening');
+      onDone?.();
+    }
+  }, []);
 
   // Initialize player
   useEffect(() => {
@@ -101,6 +133,10 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
     setCallState('ended');
     cleanupAudioInput();
     playerRef.current?.stopAll();
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -337,15 +373,24 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
         }
       };
 
-      ws.onerror = (err) => {
-        console.error('WebSocket Error:', err);
-        setErrorMessage('Connection to Ganesh Enterprises voice gateway failed. You can test via simulated caller prompt below.');
-        setCallState('error');
+      ws.onerror = () => {
+        console.warn('Live WebSocket gateway unavailable on this host (Vercel serverless). Activating serverless voice mode.');
+        setIsServerless(true);
+        isConnectedRef.current = true;
+        setCallState('connected');
+        setErrorMessage(null);
+
+        // Announce opening greeting aloud
+        if (customPrompt) {
+          sendTextMessage(customPrompt);
+        } else {
+          speakAdeshResponse('Hello, I am Adesh from Ganesh Enterprises, how can I help you?');
+        }
       };
 
       ws.onclose = () => {
         console.log('WebSocket connection closed');
-        if (isConnectedRef.current) {
+        if (isConnectedRef.current && !isServerless) {
           endCall();
         }
       };
@@ -354,7 +399,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
       setErrorMessage(`Failed to initiate call: ${msg}`);
       setCallState('error');
     }
-  }, [cleanupAudioInput, endCall, onLeadUpdated]);
+  }, [cleanupAudioInput, endCall, isServerless, speakAdeshResponse]);
 
   // Send a text message to the live session or fallback endpoint
   const sendTextMessage = useCallback(async (text: string) => {
@@ -374,22 +419,24 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'text', text }));
     } else {
-      // If not in active call, start call with this prompt or call /api/chat fallback
+      // If on serverless/Vercel or WebSocket closed, call /api/chat
       try {
         setCallState('speaking');
+        setAiLevel(0.4);
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text }),
         });
         const data = await res.json();
+        const reply = data.reply || 'Understood! I have logged that request for your facility.';
 
         setTranscripts((prev) => [
           ...prev,
           {
             id: `adesh-${Date.now()}`,
             speaker: 'adesh',
-            text: data.reply || 'Understood! I have logged that request for your facility.',
+            text: reply,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
         ]);
@@ -405,13 +452,15 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
           setActivities((prev) => [newAct, ...prev]);
           onLeadUpdated?.();
         }
-        setCallState('idle');
+
+        speakAdeshResponse(reply);
       } catch (err) {
         console.error('Chat fallback error:', err);
         setCallState('idle');
+        setAiLevel(0);
       }
     }
-  }, [onLeadUpdated]);
+  }, [onLeadUpdated, speakAdeshResponse]);
 
   const clearTranscript = useCallback(() => {
     setTranscripts([
@@ -439,6 +488,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
     micLevel,
     aiLevel,
     errorMessage,
+    isServerless,
     startCall,
     endCall,
     toggleMute,
