@@ -1,204 +1,79 @@
-import { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { CallConsole } from './components/CallConsole';
-import { TranscriptView } from './components/TranscriptView';
-import { CatalogView } from './components/CatalogView';
-import { LeadBoard } from './components/LeadBoard';
-import { DemoProgramCard } from './components/DemoProgramCard';
+import React from 'react';
+import { Navbar } from './components/Navbar';
+import { VoiceOrbVisualizer } from './components/VoiceOrbVisualizer';
+import { ChatArea } from './components/ChatArea';
 import { useVoiceCall } from './hooks/useVoiceCall';
-import { 
-  Building2, 
-  Wrench, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Sparkles,
-  PhoneCall,
-  Info
-} from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'call' | 'catalog' | 'crm' | 'demoInfo'>('call');
-  const [leadCount, setLeadCount] = useState<number>(3);
-
-  const fetchLeadCount = async () => {
-    try {
-      const res = await fetch('/api/leads');
-      if (res.ok) {
-        const data = await res.json();
-        const total = (data.quotes?.length || 0) + (data.demos?.length || 0) + (data.services?.length || 0);
-        setLeadCount(total);
-      }
-    } catch {
-      // Ignore count fetch errors
-    }
-  };
-
-  useEffect(() => {
-    fetchLeadCount();
-  }, []);
-
   const {
     callState,
     isMuted,
-    duration,
     transcripts,
-    activities,
     micLevel,
     aiLevel,
     errorMessage,
     isServerless,
+    liveSubtitle,
+    speakAdeshResponse,
     startCall,
     endCall,
     toggleMute,
-    interrupt,
     sendTextMessage,
     clearTranscript,
-  } = useVoiceCall(() => {
-    fetchLeadCount();
-  });
+  } = useVoiceCall();
 
-  const handleAskAdesh = (prompt: string) => {
-    setActiveTab('call');
-    startCall(prompt);
-  };
+  const isCallActive = callState === 'connected' || callState === 'speaking' || callState === 'listening';
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-orange-500 selection:text-black font-sans">
-      {/* Top Navigation & Brand Header */}
-      <Header
+    <div className="min-h-screen bg-[#070b16] text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black overflow-x-hidden">
+      {/* 1. Sleek Minimal Navbar */}
+      <Navbar
         callState={callState}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        leadCount={leadCount}
+        isMuted={isMuted}
+        onToggleMute={toggleMute}
+        onClearChat={clearTranscript}
+        isServerless={isServerless}
       />
 
-      {/* Main Content Stage */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        {/* Top Notice Banner */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-2.5 rounded-sm bg-zinc-900/40 border border-zinc-800 text-xs text-zinc-300 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-orange-500 shrink-0" />
-            <span className="font-mono text-xs">
-              <strong className="text-zinc-100 uppercase">INDUSTRIAL VOICE HOTLINE:</strong> Speak in English, Hindi (हिंदी), or Hinglish • Adesh mirrors your language in real-time.
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono uppercase tracking-wider">
-            <span className="w-2 h-2 rounded-none bg-emerald-400"></span>
-            {isServerless ? 'GEMINI SERVERLESS VOICE GATEWAY' : 'GEMINI LIVE AUDIO API ACTIVE'}
-          </div>
-        </div>
+      {/* 2. Main Stage: Voice Agent Visualizer + Chat Area */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch justify-center">
+        {/* Left Column: Glowing Celestial Voice Orb & Controls (Matching attached image) */}
+        <section className="lg:w-1/2 flex flex-col items-center justify-center bg-gradient-to-b from-[#0b1224]/80 to-[#070b16]/90 border border-slate-800/70 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          {/* Subtle cosmic background glow */}
+          <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
-        {/* Tab 1: Live Voice Call Console & Transcript */}
-        {activeTab === 'call' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Telephone Console (7 cols on lg) */}
-            <div className="lg:col-span-7 space-y-6">
-              <CallConsole
-                callState={callState}
-                duration={duration}
-                isMuted={isMuted}
-                micLevel={micLevel}
-                aiLevel={aiLevel}
-                errorMessage={errorMessage}
-                isServerless={isServerless}
-                onStartCall={startCall}
-                onEndCall={endCall}
-                onToggleMute={toggleMute}
-                onInterrupt={interrupt}
-                onSendMessage={sendTextMessage}
-              />
-
-              {/* Real-time Activity Feed / Recent Action Badges */}
-              {activities.length > 0 && (
-                <div className="p-4 rounded-sm bg-zinc-900/40 border border-zinc-800 space-y-2 backdrop-blur-md">
-                  <div className="flex items-center justify-between text-xs font-mono font-black text-zinc-200 uppercase tracking-wider">
-                    <span className="flex items-center gap-1.5 text-orange-400">
-                      <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                      LIVE ACTION LOG (CRM SYNCED)
-                    </span>
-                    <button
-                      onClick={() => setActiveTab('crm')}
-                      className="text-[11px] text-orange-400 hover:text-orange-300 hover:underline cursor-pointer uppercase"
-                    >
-                      VIEW IN CRM →
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5 font-mono">
-                    {activities.slice(0, 3).map((act) => (
-                      <div
-                        key={act.id}
-                        className="p-2.5 rounded-sm bg-zinc-950 border border-zinc-800 text-xs flex items-start justify-between gap-3"
-                      >
-                        <div>
-                          <p className="font-bold text-zinc-100">{act.title}</p>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">{act.details}</p>
-                        </div>
-                        <span className="text-[10px] text-zinc-500 shrink-0">{act.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Error notification if any */}
+          {errorMessage && (
+            <div className="w-full mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono text-center">
+              {errorMessage}
             </div>
+          )}
 
-            {/* Right Column: Live Transcript Viewer (5 cols on lg) */}
-            <div className="lg:col-span-5 space-y-4">
-              <TranscriptView
-                transcripts={transcripts}
-                onClear={clearTranscript}
-              />
+          {/* The Circular Voice Orb Visualizer with dynamic subtitle & status */}
+          <VoiceOrbVisualizer
+            callState={callState}
+            micLevel={micLevel}
+            aiLevel={aiLevel}
+            liveSubtitle={liveSubtitle}
+            isMuted={isMuted}
+            onToggleMic={toggleMute}
+            onStartCall={startCall}
+            onEndCall={endCall}
+          />
+        </section>
 
-              {/* Quick Persona Info Card */}
-              <div className="p-4 rounded-sm bg-zinc-900/40 border border-zinc-800 text-xs space-y-2 text-zinc-300 backdrop-blur-md">
-                <div className="flex items-center justify-between font-mono font-black uppercase text-zinc-200 tracking-wider">
-                  <span>REPRESENTATIVE ADESH</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-sm bg-orange-500/10 text-orange-400 border border-orange-500/30">
-                    AI SALES & SUPPORT
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                  Adesh greets callers with <span className="text-zinc-200 font-semibold font-mono">"Hello, I am Adesh from Ganesh Enterprises, how can I help you?"</span> and responds in your preferred language — <strong>English, Hindi (हिंदी), or Hinglish</strong>. He handles machinery specifications, trial demos, quotes, and emergency technician dispatch.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Machinery & Hardware Catalog */}
-        {activeTab === 'catalog' && (
-          <CatalogView onAskAdesh={handleAskAdesh} />
-        )}
-
-        {/* Tab 3: Special Demo & Trial Program Details */}
-        {activeTab === 'demoInfo' && (
-          <DemoProgramCard onAskAdesh={handleAskAdesh} />
-        )}
-
-        {/* Tab 4: Quotes, Demos & Service CRM */}
-        {activeTab === 'crm' && (
-          <LeadBoard onRefresh={fetchLeadCount} />
-        )}
+        {/* Right Column: Clean Chat Conversation Stream & Input Area */}
+        <section className="lg:w-1/2 flex flex-col min-h-[480px] lg:min-h-[580px]">
+          <ChatArea
+            transcripts={transcripts}
+            isCallActive={isCallActive}
+            onSendMessage={sendTextMessage}
+            onStartCall={startCall}
+            onSpeakText={speakAdeshResponse}
+          />
+        </section>
       </main>
-
-      {/* Industrial Footer */}
-      <footer className="border-t border-zinc-800 bg-zinc-950 text-zinc-400 text-xs font-mono py-6 mt-12">
-        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 uppercase tracking-wider">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-black text-zinc-200">GANESH ENTERPRISES</span>
-            <span>•</span>
-            <span>HEAVY MACHINERY & INDUSTRIAL HARDWARE</span>
-            <span>•</span>
-            <span className="text-orange-500 font-bold">ISO 9001:2015</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 text-zinc-400">
-            <span>HOTLINE: +91 (020) 2448-8000</span>
-            <span>•</span>
-            <span>SUPPORT@GANESHENTERPRISES.IND.IN</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -30,8 +30,9 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
   const [micLevel, setMicLevel] = useState<number>(0);
   const [aiLevel, setAiLevel] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [liveSubtitle, setLiveSubtitle] = useState<string>("What's the price of VMC-850...");
 
-  // References for audio & connection
+  // References for audio, recognition & connection
   const wsRef = useRef<WebSocket | null>(null);
   const playerRef = useRef<LiveAudioPlayer | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -40,6 +41,8 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMutedRef = useRef<boolean>(false);
   const isConnectedRef = useRef<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   isMutedRef.current = isMuted;
 
@@ -141,6 +144,15 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
     }
 
     setTranscripts((prev) => [
@@ -292,6 +304,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
           }
 
           if (msg.type === 'transcript_model' && msg.text) {
+            setLiveSubtitle(msg.text);
             setTranscripts((prev) => {
               const last = prev[prev.length - 1];
               // If last was also model in rapid succession, merge or append
@@ -314,6 +327,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
           }
 
           if (msg.type === 'transcript_user' && msg.text) {
+            setLiveSubtitle(msg.text);
             setTranscripts((prev) => [
               ...prev,
               {
@@ -405,6 +419,8 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
   const sendTextMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
 
+    setLiveSubtitle(text);
+
     // Append to transcript
     setTranscripts((prev) => [
       ...prev,
@@ -430,6 +446,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
         });
         const data = await res.json();
         const reply = data.reply || 'Understood! I have logged that request for your facility.';
+        setLiveSubtitle(reply);
 
         setTranscripts((prev) => [
           ...prev,
@@ -463,6 +480,7 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
   }, [onLeadUpdated, speakAdeshResponse]);
 
   const clearTranscript = useCallback(() => {
+    setLiveSubtitle("What's the price of VMC-850...");
     setTranscripts([
       {
         id: `sys-${Date.now()}`,
@@ -489,6 +507,9 @@ export function useVoiceCall(onLeadUpdated?: () => void) {
     aiLevel,
     errorMessage,
     isServerless,
+    liveSubtitle,
+    setLiveSubtitle,
+    speakAdeshResponse,
     startCall,
     endCall,
     toggleMute,
